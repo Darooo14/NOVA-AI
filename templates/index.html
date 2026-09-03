@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NOVA AI</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <!-- ========================= -->
+    <!-- SIDEBAR -->
+    <!-- ========================= -->
+
+    <aside class="sidebar" id="sidebar">
+
+        <div class="brand">
+            <div class="brand-logo">✦</div>
+
+            <div class="brand-name">
+                NOVA
+                <span>AI</span>
+            </div>
+        </div>
+
+
+        <button
+            class="new-chat"
+            onclick="newChat()"
+        >
+            <span>＋</span>
+            New Chat
+        </button>
+
+
+        <div class="sidebar-title">
+            RECENT CHATS
+        </div>
+
+
+        <div
+            class="recent-chats"
+            id="recentChats"
+        >
+            <!-- Nanti chat terbaru bisa ditampilkan di sini -->
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <button
+                class="sidebar-btn"
+                onclick="clearChat()"
+            >
+                🗑️
+                <span>Clear Chat</span>
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <!-- ========================= -->
+    <!-- MAIN -->
+    <!-- ========================= -->
+
+    <main class="main">
+
+        <!-- TOPBAR -->
+
+        <header class="topbar">
+
+            <button
+                class="menu-btn"
+                onclick="toggleSidebar()"
+            >
+                ☰
+            </button>
+
+
+            <div class="topbar-title">
+                NOVA AI
+            </div>
+
+
+            <div class="status">
+
+                <span class="status-dot"></span>
+
+                Online
+
+            </div>
+
+        </header>
+
+
+        <!-- ========================= -->
+        <!-- CHAT -->
+        <!-- ========================= -->
+
+        <section
+            class="chat"
+            id="chat"
+        >
+
+            <!-- WELCOME -->
+
+            <div class="welcome">
+
+                <div class="welcome-logo">
+                    ✦
+                </div>
+
+
+                <h1>
+                    Halo, aku NOVA 👋
+                </h1>
+
+
+                <p>
+                    Asisten AI pribadi kamu.
+                    Tanya apa saja dan kita mulai.
+                </p>
+
+
+                <!-- SUGGESTIONS -->
+
+                <div class="suggestions">
+
+                    <button
+                        onclick="useSuggestion('Jelaskan apa itu Python')"
+                    >
+                        💻
+                        <span>Jelaskan Python</span>
+                    </button>
+
+
+                    <button
+                        onclick="useSuggestion('Bantu saya belajar')"
+                    >
+                        📚
+                        <span>Bantu belajar</span>
+                    </button>
+
+
+                    <button
+                        onclick="useSuggestion('Berikan ide project keren')"
+                    >
+                        🚀
+                        <span>Ide project</span>
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ========================= -->
+        <!-- INPUT AREA -->
+        <!-- ========================= -->
+
+        <div class="input-area">
+
+            <div class="input-box">
+
+                <textarea
+                    id="message"
+                    placeholder="Tanya sesuatu kepada NOVA..."
+                    rows="1"
+                    onkeydown="handleKey(event)"
+                ></textarea>
+
+
+                <button
+                    id="sendBtn"
+                    class="send-btn"
+                    onclick="sendMessage()"
+                    title="Kirim pesan"
+                >
+                    ➤
+                </button>
+
+            </div>
+
+
+            <div class="input-hint">
+                Enter untuk mengirim • Shift + Enter untuk baris baru
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- ========================= -->
+    <!-- JAVASCRIPT -->
+    <!-- ========================= -->
+
+    <script
+        src="{{ url_for('static', filename='script.js') }}"
+    ></script>
+
+</body>
+</html>
