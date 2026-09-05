@@ -20,7 +20,7 @@ if API_KEY:
 
 
 # =========================
-# AI
+# AI CHAT
 # =========================
 
 def ask_ai(message, history):
@@ -32,10 +32,9 @@ def ask_ai(message, history):
         {
             "role": "system",
             "content": (
-                "Kamu adalah NOVA AI, asisten AI pribadi yang pintar, "
-                "ramah, cepat, dan membantu. "
-                "Jawab dalam bahasa yang digunakan pengguna. "
-                "Berikan jawaban yang jelas, natural, dan mudah dipahami."
+                "Kamu adalah NOVA AI, asisten AI yang ramah, pintar, "
+                "dan membantu. Jawab dalam bahasa pengguna. "
+                "Berikan jawaban yang jelas dan mudah dipahami."
             )
         }
     ]
@@ -80,7 +79,7 @@ def ask_ai(message, history):
 
 
 # =========================
-# HALAMAN UTAMA
+# HOME
 # =========================
 
 @app.route("/")
@@ -89,7 +88,7 @@ def home():
 
 
 # =========================
-# CHAT
+# CHAT API
 # =========================
 
 @app.route("/chat", methods=["POST"])
@@ -103,6 +102,7 @@ def chat():
         })
 
     message = data.get("message", "").strip()
+
     history = data.get("history", [])
 
     if not message:
@@ -118,35 +118,103 @@ def chat():
 
 
 # =========================
+# ABOUT
+# =========================
+
+@app.route("/about")
+def about():
+
+    return """
+    <!DOCTYPE html>
+    <html lang="id">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        >
+
+        <title>Tentang NOVA AI — Asisten AI Online</title>
+
+        <meta
+            name="description"
+            content="NOVA AI adalah asisten AI online untuk membantu belajar, coding, menjawab pertanyaan, dan berbagai kebutuhan sehari-hari."
+        >
+
+    </head>
+
+    <body>
+
+        <h1>NOVA AI</h1>
+
+        <p>
+            NOVA AI adalah asisten AI online yang membantu pengguna
+            menjawab pertanyaan, belajar, coding, dan berbagai kebutuhan
+            sehari-hari.
+        </p>
+
+        <h2>Fitur NOVA AI</h2>
+
+        <ul>
+            <li>Chat dengan AI</li>
+            <li>Membantu belajar</li>
+            <li>Membantu coding</li>
+            <li>Menjawab berbagai pertanyaan</li>
+        </ul>
+
+        <h2>Tentang NOVA</h2>
+
+        <p>
+            NOVA dirancang sebagai asisten AI sederhana yang dapat
+            digunakan secara online melalui browser.
+        </p>
+
+        <p>
+            <a href="/">Buka NOVA AI</a>
+        </p>
+
+    </body>
+
+    </html>
+    """
+
+
+# =========================
 # ROBOTS.TXT
 # =========================
 
 @app.route("/robots.txt")
 def robots():
 
-    text = """User-agent: *
+    return """User-agent: *
 Allow: /
 
 Sitemap: https://1athaadaichiro1.pythonanywhere.com/sitemap.xml
-"""
-
-    return text, 200, {
+""", 200, {
         "Content-Type": "text/plain"
     }
 
 
 # =========================
-# SITEMAP
+# SITEMAP.XML
 # =========================
 
 @app.route("/sitemap.xml")
 def sitemap():
 
     xml = """<?xml version="1.0" encoding="UTF-8"?>
+
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
     <url>
         <loc>https://1athaadaichiro1.pythonanywhere.com/</loc>
+    </url>
+
+    <url>
+        <loc>https://1athaadaichiro1.pythonanywhere.com/about</loc>
     </url>
 
 </urlset>
