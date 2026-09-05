@@ -1,81 +1,86 @@
 from flask import Flask, render_template, request, jsonify
-from datetime import datetime
+from openai import OpenAI
 import os
-import re
-from huggingface_hub import InferenceClient
 
 app = Flask(__name__)
 
-HF_TOKEN = os.getenv("HF_TOKEN")
+# =========================
+# OPENROUTER
+# =========================
 
-if HF_TOKEN:
-    client = InferenceClient(
-        api_key=HF_TOKEN,
-        provider="auto"
+API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+client = None
+
+if API_KEY:
+    client = OpenAI(
+        api_key=API_KEY,
+        base_url="https://openrouter.ai/api/v1"
     )
-else:
-    client = None
 
 
 # =========================
-# AI DENGAN MEMORY
+# AI
 # =========================
 
 def ask_ai(message, history):
+
     if client is None:
-        return "HF_TOKEN belum terpasang."
+        return "OPENROUTER_API_KEY belum terpasang."
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Kamu adalah NOVA AI, asisten AI pribadi yang pintar, "
+                "ramah, cepat, dan membantu. "
+                "Jawab dalam bahasa yang digunakan pengguna. "
+                "Berikan jawaban yang jelas, natural, dan mudah dipahami."
+            )
+        }
+    ]
+
+    # Memory percakapan
+    for item in history[-10:]:
+
+        if item.get("role") == "user":
+            messages.append({
+                "role": "user",
+                "content": item.get("text", "")
+            })
+
+        elif item.get("role") == "assistant":
+            messages.append({
+                "role": "assistant",
+                "content": item.get("text", "")
+            })
+
+    # Pesan terbaru
+    messages.append({
+        "role": "user",
+        "content": message
+    })
 
     try:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Kamu adalah NOVA AI, asisten AI yang ramah, "
-                    "cerdas, jelas, dan membantu. "
-                    "Gunakan bahasa Indonesia jika pengguna menggunakan "
-                    "bahasa Indonesia. "
-                    "Ingat dan gunakan konteks percakapan sebelumnya "
-                    "dalam chat ini."
-                )
-            }
-        ]
-
-        # Masukkan percakapan sebelumnya
-        for item in history:
-            if item.get("sender") == "user":
-                messages.append({
-                    "role": "user",
-                    "content": item.get("text", "")
-                })
-
-            elif item.get("sender") == "ai":
-                messages.append({
-                    "role": "assistant",
-                    "content": item.get("text", "")
-                })
-
-        # Pesan terbaru
-        messages.append({
-            "role": "user",
-            "content": message
-        })
 
         response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V3-0324",
+            model="openrouter/free",
             messages=messages,
-            max_tokens=500,
+            max_tokens=700,
             temperature=0.7
         )
 
         return response.choices[0].message.content
 
     except Exception as e:
+
         print("ERROR AI:", repr(e))
+
         return f"ERROR AI: {e}"
 
 
 # =========================
-# HOME
+# HALAMAN UTAMA
 # =========================
 
 @app.route("/")
@@ -90,182 +95,76 @@ def home():
 @app.route("/chat", methods=["POST"])
 def chat():
 
-    data = request.json or {}
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "reply": "Data tidak diterima."
+        })
 
     message = data.get("message", "").strip()
-
-    # Ambil history dari browser
     history = data.get("history", [])
-
-    lower = message.lower()
 
     if not message:
         return jsonify({
-            "response": "Tulis sesuatu dulu 😄"
+            "reply": "Pesannya masih kosong 😄"
         })
 
-
-    # =========================
-    # JAM
-    # =========================
-
-    if "jam berapa" in lower or "sekarang jam" in lower:
-
-        waktu = datetime.now().strftime("%H:%M:%S")
-
-        return jsonify({
-            "response": f"Sekarang pukul **{waktu}** ⏰"
-        })
-
-
-    # =========================
-    # TANGGAL
-    # =========================
-
-    if "tanggal berapa" in lower or "hari apa" in lower:
-
-        sekarang = datetime.now()
-
-        tanggal = sekarang.strftime("%d-%m-%Y")
-        hari = sekarang.strftime("%A")
-
-        hari_id = {
-            "Monday": "Senin",
-            "Tuesday": "Selasa",
-            "Wednesday": "Rabu",
-            "Thursday": "Kamis",
-            "Friday": "Jumat",
-            "Saturday": "Sabtu",
-            "Sunday": "Minggu"
-        }
-
-        return jsonify({
-            "response": (
-                f"Hari ini **{hari_id.get(hari, hari)}**, "
-                f"{tanggal} 📅"
-            )
-        })
-
-
-    # =========================
-    # KALKULATOR
-    # =========================
-
-    if lower.startswith("hitung "):
-
-        expression = message[7:].strip()
-
-        if re.fullmatch(r"[0-9+\-*/(). %]+", expression):
-
-            try:
-
-                result = eval(
-                    expression,
-                    {"__builtins__": None},
-                    {}
-                )
-
-                return jsonify({
-                    "response": f"Hasilnya adalah **{result}** 🧮"
-                })
-
-            except Exception:
-
-                return jsonify({
-                    "response": "Hmm, perhitungannya tidak valid 😅"
-                })
-
-
-    # =========================
-    # SAPAAN
-    # =========================
-
-    if lower in ["halo", "hai", "hello", "hey"]:
-
-        return jsonify({
-            "response": (
-                "Halo! 👋 Aku NOVA AI. "
-                "Ada yang bisa aku bantu?"
-            )
-        })
-
-
-    # =========================
-    # IDENTITAS
-    # =========================
-
-    if "siapa kamu" in lower or "kamu siapa" in lower:
-
-        return jsonify({
-            "response": (
-                "Aku **NOVA AI** 🤖, "
-                "asisten AI buatan kamu."
-            )
-        })
-
-
-    # =========================
-    # TERIMA KASIH
-    # =========================
-
-    if "makasih" in lower or "terima kasih" in lower:
-
-        return jsonify({
-            "response": "Sama-sama! 😎"
-        })
-
-
-    # =========================
-    # HELP
-    # =========================
-
-    if lower in ["help", "bantuan", "tolong"]:
-
-        return jsonify({
-            "response": """
-### 🚀 NOVA AI
-
-Sekarang aku bisa:
-
-- 🤖 Chat dengan AI
-- 🧠 Mengingat konteks percakapan
-- 🕐 Menampilkan waktu
-- 📅 Menampilkan tanggal
-- 🧮 Kalkulator
-- 💬 Menjawab pertanyaan
-- 💻 Membantu coding
-- 📚 Membantu belajar
-
-Contoh:
-
-`jam berapa sekarang`
-
-`hitung 25 * 4`
-
-atau langsung tanyakan sesuatu ke NOVA.
-"""
-        })
-
-
-    # =========================
-    # AI
-    # =========================
-
-    response = ask_ai(message, history)
+    reply = ask_ai(message, history)
 
     return jsonify({
-        "response": response
+        "reply": reply
     })
 
 
 # =========================
-# START SERVER
+# ROBOTS.TXT
+# =========================
+
+@app.route("/robots.txt")
+def robots():
+
+    text = """User-agent: *
+Allow: /
+
+Sitemap: https://1athaadaichiro1.pythonanywhere.com/sitemap.xml
+"""
+
+    return text, 200, {
+        "Content-Type": "text/plain"
+    }
+
+
+# =========================
+# SITEMAP
+# =========================
+
+@app.route("/sitemap.xml")
+def sitemap():
+
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+    <url>
+        <loc>https://1athaadaichiro1.pythonanywhere.com/</loc>
+    </url>
+
+</urlset>
+"""
+
+    return xml, 200, {
+        "Content-Type": "application/xml"
+    }
+
+
+# =========================
+# LOCAL SERVER
 # =========================
 
 if __name__ == "__main__":
 
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=5000,
         debug=True
     )
