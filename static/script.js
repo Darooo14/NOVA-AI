@@ -1,42 +1,32 @@
 const chat = document.getElementById("chat");
-const input = document.getElementById("message");
+const messageInput = document.getElementById("message");
 const sendBtn = document.getElementById("sendBtn");
 
-let messages = JSON.parse(localStorage.getItem("nova_messages")) || [];
+let history = JSON.parse(localStorage.getItem("nova_history") || "[]");
 
-window.addEventListener("DOMContentLoaded", () => {
-    if (messages.length > 0) {
-        document.querySelector(".welcome")?.remove();
-
-        messages.forEach(msg => {
-            addMessage(msg.text, msg.sender, false);
-        });
-
-        chat.scrollTop = chat.scrollHeight;
-    }
-
-    input.focus();
+document.addEventListener("DOMContentLoaded", () => {
+    restoreChat();
+    autoResize();
 });
 
-// =========================
-// KIRIM PESAN
-// =========================
+function handleKey(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
+}
+
 async function sendMessage() {
-    const text = input.value.trim();
+    const message = messageInput.value.trim();
 
-    if (!text || sendBtn.disabled) return;
+    if (!message) return;
 
-    document.querySelector(".welcome")?.remove();
+    addMessage("user", message);
 
-    addMessage(text, "user");
-    saveMessage(text, "user");
+    messageInput.value = "";
+    autoResize();
 
-    input.value = "";
-    input.style.height = "auto";
-
-    sendBtn.disabled = true;
-
-    const loading = addLoading();
+    setLoading(true);
 
     try {
         const response = await fetch("/chat", {
@@ -45,348 +35,179 @@ async function sendMessage() {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                message: text,
-                history: messages.slice(0, -1)
+                message: message,
+                history: history
             })
         });
 
         if (!response.ok) {
-            throw new Error("Server error: " + response.status);
+            throw new Error("HTTP " + response.status);
         }
 
         const data = await response.json();
 
-        loading.remove();
+        if (!data.reply) {
+            throw new Error("Response tidak memiliki reply");
+        }
 
-        addMessage(data.response, "ai");
-        saveMessage(data.response, "ai");
+        addMessage("assistant", data.reply);
 
     } catch (error) {
-        console.error("ERROR:", error);
-
-        loading.remove();
+        console.error("AKA ERROR:", error);
 
         addMessage(
-            "⚠️ Gagal menghubungi server NOVA.",
-            "ai"
+            "assistant",
+            "⚠️ Gagal membaca respons dari server AKA."
         );
     }
 
-    sendBtn.disabled = false;
-    input.focus();
+    setLoading(false);
 }
 
-// =========================
-// ENTER = KIRIM
-// SHIFT + ENTER = BARIS BARU
-// =========================
-input.addEventListener("keydown", function(event) {
+function addMessage(role, text) {
+    const welcome = document.querySelector(".welcome");
 
-    if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        sendMessage();
+    if (welcome) {
+        welcome.remove();
     }
-
-});
-
-// =========================
-// AUTO RESIZE TEXTAREA
-// =========================
-input.addEventListener("input", function() {
-
-    this.style.height = "auto";
-
-    this.style.height =
-        Math.min(this.scrollHeight, 150) + "px";
-
-});
-
-// =========================
-// TAMBAH PESAN
-// =========================
-function addMessage(text, sender, scroll = true) {
 
     const wrapper = document.createElement("div");
-
-    wrapper.className = "message " + sender;
+    wrapper.className = "message " + role;
 
     const avatar = document.createElement("div");
-
     avatar.className = "avatar";
-
-    avatar.textContent =
-        sender === "user" ? "👤" : "✦";
+    avatar.textContent = role === "user" ? "👤" : "✦";
 
     const content = document.createElement("div");
-
     content.className = "message-content";
 
-    if (sender === "ai") {
-
-        content.innerHTML = renderMarkdown(text);
-
-        const copy = document.createElement("button");
-
-        copy.className = "copy-btn";
-
-        copy.textContent = "📋 Copy";
-
-        copy.onclick = () => {
-
-            navigator.clipboard.writeText(text);
-
-            copy.textContent = "✓ Copied";
-
-            setTimeout(() => {
-                copy.textContent = "📋 Copy";
-            }, 1500);
-
-        };
-
-        content.appendChild(copy);
-
-    } else {
-
-        content.textContent = text;
-
-    }
+    content.innerHTML = formatText(text);
 
     wrapper.appendChild(avatar);
     wrapper.appendChild(content);
 
     chat.appendChild(wrapper);
 
-    if (scroll) {
-        chat.scrollTop = chat.scrollHeight;
-    }
-}
-
-// =========================
-// MARKDOWN
-// =========================
-function renderMarkdown(text) {
-
-    let html = escapeHTML(text);
-
-    html = html.replace(
-        /```(\w+)?\n?([\s\S]*?)```/g,
-        function(match, language, code) {
-
-            const lang = language || "code";
-
-            return `
-                <div class="code-block">
-
-                    <div class="code-header">
-                        <span>${lang}</span>
-
-                        <button onclick="copyCode(this)">
-                            📋 Copy
-                        </button>
-                    </div>
-
-                    <pre><code>${code.trim()}</code></pre>
-
-                </div>
-            `;
-        }
-    );
-
-    html = html.replace(
-        /`([^`]+)`/g,
-        "<code class='inline-code'>$1</code>"
-    );
-
-    html = html.replace(
-        /\*\*(.*?)\*\*/g,
-        "<strong>$1</strong>"
-    );
-
-    html = html.replace(
-        /^### (.*)$/gm,
-        "<h3>$1</h3>"
-    );
-
-    html = html.replace(
-        /^## (.*)$/gm,
-        "<h2>$1</h2>"
-    );
-
-    html = html.replace(
-        /^# (.*)$/gm,
-        "<h1>$1</h1>"
-    );
-
-    html = html.replace(
-        /^[-*] (.*)$/gm,
-        "<li>$1</li>"
-    );
-
-    html = html.replace(
-        /(<li>.*<\/li>)/gs,
-        "<ul>$1</ul>"
-    );
-
-    html = html.replace(/\n/g, "<br>");
-
-    return html;
-}
-
-// =========================
-// ESCAPE HTML
-// =========================
-function escapeHTML(text) {
-
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-// =========================
-// COPY CODE
-// =========================
-function copyCode(button) {
-
-    const code = button
-        .closest(".code-block")
-        .querySelector("code")
-        .innerText;
-
-    navigator.clipboard.writeText(code);
-
-    button.textContent = "✓ Copied";
-
-    setTimeout(() => {
-        button.textContent = "📋 Copy";
-    }, 1500);
-}
-
-// =========================
-// LOADING
-// =========================
-function addLoading() {
-
-    const wrapper = document.createElement("div");
-
-    wrapper.className = "message ai";
-
-    wrapper.innerHTML = `
-        <div class="avatar">✦</div>
-
-        <div class="message-content">
-
-            <div class="typing">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-
-        </div>
-    `;
-
-    chat.appendChild(wrapper);
-
     chat.scrollTop = chat.scrollHeight;
 
-    return wrapper;
-}
-
-// =========================
-// SIMPAN CHAT
-// =========================
-function saveMessage(text, sender) {
-
-    messages.push({
-        text: text,
-        sender: sender
+    history.push({
+        role: role,
+        text: text
     });
 
+    history = history.slice(-20);
+
     localStorage.setItem(
-        "nova_messages",
-        JSON.stringify(messages)
+        "nova_history",
+        JSON.stringify(history)
     );
 }
 
-// =========================
-// NEW CHAT
-// =========================
-function newChat() {
-
-    messages = [];
-
-    localStorage.removeItem("nova_messages");
-
-    chat.innerHTML = `
-        <div class="welcome">
-
-            <div class="welcome-logo">✦</div>
-
-            <h1>Halo, aku NOVA 👋</h1>
-
-            <p>
-                Asisten AI pribadi kamu.
-                Tanya apa saja dan kita mulai.
-            </p>
-
-            <div class="suggestions">
-
-                <button onclick="useSuggestion('Jelaskan apa itu Python')">
-                    💻 <span>Jelaskan Python</span>
-                </button>
-
-                <button onclick="useSuggestion('Bantu saya belajar')">
-                    📚 <span>Bantu belajar</span>
-                </button>
-
-                <button onclick="useSuggestion('Berikan ide project keren')">
-                    🚀 <span>Ide project</span>
-                </button>
-
-            </div>
-
-        </div>
-    `;
-
-    input.value = "";
-
-    input.focus();
+function formatText(text) {
+    return escapeHTML(text)
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\n/g, "<br>");
 }
 
-// =========================
-// CLEAR CHAT
-// =========================
-function clearChat() {
+function escapeHTML(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
 
-    if (messages.length === 0) return;
+function restoreChat() {
+    if (!history.length) return;
 
-    if (confirm("Hapus semua percakapan NOVA?")) {
-        newChat();
+    const welcome = document.querySelector(".welcome");
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+    history.forEach(item => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "message " + item.role;
+
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent =
+            item.role === "user" ? "👤" : "✦";
+
+        const content = document.createElement("div");
+        content.className = "message-content";
+        content.innerHTML = formatText(item.text);
+
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(content);
+
+        chat.appendChild(wrapper);
+    });
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function setLoading(loading) {
+    sendBtn.disabled = loading;
+
+    if (loading) {
+        sendBtn.textContent = "⏳";
+    } else {
+        sendBtn.textContent = "➤";
     }
 }
 
-// =========================
-// SUGGESTION
-// =========================
+function autoResize() {
+    messageInput.style.height = "auto";
+    messageInput.style.height =
+        Math.min(messageInput.scrollHeight, 180) + "px";
+}
+
+messageInput.addEventListener("input", autoResize);
+
+function newChat() {
+    history = [];
+
+    localStorage.removeItem("nova_history");
+
+    location.reload();
+}
+
+function clearChat() {
+    history = [];
+
+    localStorage.removeItem("nova_history");
+
+    location.reload();
+}
+
 function useSuggestion(text) {
-
-    input.value = text;
-
-    input.focus();
-
-    sendMessage();
+    messageInput.value = text;
+    autoResize();
+    messageInput.focus();
 }
 
-// =========================
-// SIDEBAR
-// =========================
 function toggleSidebar() {
+    const sidebar = document.getElementById("sidebar");
 
-    document
-        .getElementById("sidebar")
-        .classList.toggle("open");
+    if (sidebar) {
+        sidebar.classList.toggle("open");
+    }
 }
+
+/* MOBILE + DESKTOP ENTER */
+
+
+
+/* AKA FORM SUBMIT */
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("chatForm");
+
+    if (!form) return;
+
+    form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        sendMessage();
+    });
+});

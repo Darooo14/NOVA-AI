@@ -4,6 +4,7 @@ import os
 
 app = Flask(__name__)
 
+
 # =========================
 # OPENROUTER
 # =========================
@@ -32,7 +33,7 @@ def ask_ai(message, history):
         {
             "role": "system",
             "content": (
-                "Kamu adalah NOVA AI, asisten AI yang ramah, pintar, "
+                "Kamu adalah AKA AI, asisten AI yang ramah, pintar, "
                 "dan membantu. Jawab dalam bahasa pengguna. "
                 "Berikan jawaban yang jelas dan mudah dipahami."
             )
@@ -88,6 +89,16 @@ def home():
 
 
 # =========================
+# GOOGLE SEARCH CONSOLE
+# =========================
+
+@app.route("/google3285bcbbbb9a1083.html")
+def google_verification():
+
+    return "google-site-verification: google3285bcbbbb9a1083.html"
+
+
+# =========================
 # CHAT API
 # =========================
 
@@ -137,26 +148,26 @@ def about():
             content="width=device-width, initial-scale=1.0"
         >
 
-        <title>Tentang NOVA AI — Asisten AI Online</title>
+        <title>Tentang AKA AI — Asisten AI Online</title>
 
         <meta
             name="description"
-            content="NOVA AI adalah asisten AI online untuk membantu belajar, coding, menjawab pertanyaan, dan berbagai kebutuhan sehari-hari."
+            content="AKA AI adalah asisten AI online untuk membantu belajar, coding, menjawab pertanyaan, dan berbagai kebutuhan sehari-hari."
         >
 
     </head>
 
     <body>
 
-        <h1>NOVA AI</h1>
+        <h1>AKA AI</h1>
 
         <p>
-            NOVA AI adalah asisten AI online yang membantu pengguna
+            AKA AI adalah asisten AI online yang membantu pengguna
             menjawab pertanyaan, belajar, coding, dan berbagai kebutuhan
             sehari-hari.
         </p>
 
-        <h2>Fitur NOVA AI</h2>
+        <h2>Fitur AKA AI</h2>
 
         <ul>
             <li>Chat dengan AI</li>
@@ -165,15 +176,15 @@ def about():
             <li>Menjawab berbagai pertanyaan</li>
         </ul>
 
-        <h2>Tentang NOVA</h2>
+        <h2>Tentang AKA</h2>
 
         <p>
-            NOVA dirancang sebagai asisten AI sederhana yang dapat
+            AKA dirancang sebagai asisten AI sederhana yang dapat
             digunakan secara online melalui browser.
         </p>
 
         <p>
-            <a href="/">Buka NOVA AI</a>
+            <a href="/">Buka AKA AI</a>
         </p>
 
     </body>

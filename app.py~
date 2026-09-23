@@ -1,0 +1,9 @@
+cd ~/NOVA-AI
+grep -A5 "if HF_TOKEN" app.py
+cd ~/NOVA-AI
+grep -n "InferenceClient" app.py
+grep -n "HF_TOKEN" app.py
+cd ~/NOVA-AI
+grep -n "InferenceClient" app.py
+grep -n "HF_TOKEN" app.py | sed 's/=.*/= [TERSEMBUNYI]/'
+
