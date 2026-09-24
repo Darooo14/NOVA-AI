@@ -1,8 +1,3 @@
-/* =========================================================
-   AKA AI — FULL SCRIPT
-   Clean Markdown Renderer + Streaming + Chat History
-   ========================================================= */
-
 const chat = document.getElementById("chat");
 const messageInput = document.getElementById("message");
 const sendBtn = document.getElementById("sendBtn");
@@ -11,78 +6,43 @@ let history = JSON.parse(
     localStorage.getItem("nova_history") || "[]"
 );
 
-
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
-
 document.addEventListener("DOMContentLoaded", () => {
-
     restoreChat();
 
     const form = document.getElementById("chatForm");
 
     if (form) {
-        form.addEventListener("submit", function (event) {
-            event.preventDefault();
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
             sendMessage();
         });
     }
 
     if (messageInput) {
-
-        messageInput.addEventListener("keydown", function (event) {
-
-            if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.isComposing
-            ) {
-                event.preventDefault();
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
                 sendMessage();
             }
-
         });
-
     }
-
-    setupSuggestionButtons();
-
 });
 
 
-/* =========================================================
-   ESCAPE HTML
-   ========================================================= */
-
 function escapeHTML(text) {
-
     const div = document.createElement("div");
-
     div.textContent = text;
-
     return div.innerHTML;
-
 }
 
 
-/* =========================================================
-   INLINE MARKDOWN
-   ========================================================= */
-
-function formatInline(text) {
-
+function inlineMarkdown(text) {
     let result = escapeHTML(text);
-
-    /* Inline code */
 
     result = result.replace(
         /`([^`\n]+)`/g,
         "<code>$1</code>"
     );
-
-
-    /* Bold */
 
     result = result.replace(
         /\*\*(.+?)\*\*/g,
@@ -90,442 +50,187 @@ function formatInline(text) {
     );
 
     result = result.replace(
-        /__(.+?)__/g,
-        "<strong>$1</strong>"
+        /\*(.+?)\*/g,
+        "<em>$1</em>"
     );
-
-
-    /* Italic */
-
-    result = result.replace(
-        /(^|[^\*])\*([^*\n]+)\*(?!\*)/g,
-        "$1<em>$2</em>"
-    );
-
-    result = result.replace(
-        /(^|[^_])_([^_\n]+)_(?!_)/g,
-        "$1<em>$2</em>"
-    );
-
-
-    /* Links */
-
-    result = result.replace(
-        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
-
-
-    /* URL */
-
-    result = result.replace(
-        /(^|[\s>])(https?:\/\/[^\s<]+)/g,
-        '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>'
-    );
-
 
     return result;
-
 }
 
 
-/* =========================================================
-   MARKDOWN RENDERER
-   ========================================================= */
-
 function formatText(text) {
 
-    if (
-        text === null ||
-        text === undefined
-    ) {
-        return "";
-    }
-
+    if (!text) return "";
 
     text = String(text)
         .replace(/\r\n/g, "\n")
         .replace(/\r/g, "\n");
 
-
     const lines = text.split("\n");
 
     let html = "";
-
     let paragraph = [];
-
     let listType = null;
-
     let listItems = [];
-
-    let inCodeBlock = false;
-
-    let codeLanguage = "";
-
+    let codeMode = false;
     let codeLines = [];
 
 
-    /* -----------------------------------------------------
-       PARAGRAPH
-       ----------------------------------------------------- */
-
     function flushParagraph() {
-
-        if (!paragraph.length) {
-            return;
-        }
-
-
-        const content = paragraph
-            .map(line => formatInline(line))
-            .join("<br>");
-
+        if (!paragraph.length) return;
 
         html += `
-            <p>${content}</p>
+            <p>
+                ${paragraph
+                    .map(inlineMarkdown)
+                    .join("<br>")}
+            </p>
         `;
 
-
         paragraph = [];
-
     }
 
 
-    /* -----------------------------------------------------
-       LIST
-       ----------------------------------------------------- */
-
     function flushList() {
-
-        if (!listItems.length) {
-            return;
-        }
-
+        if (!listItems.length) return;
 
         const tag =
             listType === "ol"
                 ? "ol"
                 : "ul";
 
-
         html += `<${tag}>`;
 
-
         listItems.forEach(item => {
-
-            html += `
-                <li>
-                    ${formatInline(item)}
-                </li>
-            `;
-
+            html += `<li>${inlineMarkdown(item)}</li>`;
         });
-
 
         html += `</${tag}>`;
 
-
         listItems = [];
-
         listType = null;
-
     }
 
-
-    /* -----------------------------------------------------
-       CODE
-       ----------------------------------------------------- */
 
     function flushCode() {
-
-        if (!inCodeBlock) {
-            return;
-        }
-
-
-        const code =
-            escapeHTML(
-                codeLines.join("\n")
-            );
-
-
-        const language =
-            codeLanguage
-                ? ` class="language-${escapeHTML(codeLanguage)}"`
-                : "";
-
+        if (!codeLines.length) return;
 
         html += `
-            <pre><code${language}>${code}</code></pre>
+            <pre><code>${escapeHTML(
+                codeLines.join("\n")
+            )}</code></pre>
         `;
 
-
         codeLines = [];
-
-        codeLanguage = "";
-
-        inCodeBlock = false;
-
     }
 
 
-    /* -----------------------------------------------------
-       PROCESS
-       ----------------------------------------------------- */
+    for (let i = 0; i < lines.length; i++) {
 
-    for (
-        let i = 0;
-        i < lines.length;
-        i++
-    ) {
-
-        const rawLine = lines[i];
-
-        const line = rawLine.trimEnd();
+        const line = lines[i];
 
 
-        /* =================================================
-           CODE BLOCK
-           ================================================= */
+        /* CODE BLOCK */
 
-        if (
-            line.trim().startsWith("```")
-        ) {
+        if (line.trim().startsWith("```")) {
 
-            if (!inCodeBlock) {
+            if (!codeMode) {
 
                 flushParagraph();
-
                 flushList();
 
-                inCodeBlock = true;
-
-                codeLanguage =
-                    line
-                        .trim()
-                        .substring(3)
-                        .trim();
+                codeMode = true;
 
             } else {
 
                 flushCode();
 
+                codeMode = false;
             }
 
             continue;
-
         }
 
 
-        if (inCodeBlock) {
-
-            codeLines.push(rawLine);
-
+        if (codeMode) {
+            codeLines.push(line);
             continue;
-
         }
 
 
-        /* =================================================
-           EMPTY LINE
-           ================================================= */
+        /* EMPTY */
 
-        if (
-            line.trim() === ""
-        ) {
+        if (line.trim() === "") {
 
             flushParagraph();
-
             flushList();
 
             continue;
-
         }
 
 
-        /* =================================================
-           HEADING
-           ================================================= */
+        /* HEADING */
 
         const heading =
-            line.match(
-                /^(#{1,4})\s+(.+)$/
-            );
-
+            line.match(/^(#{1,3})\s+(.+)$/);
 
         if (heading) {
 
             flushParagraph();
-
             flushList();
-
 
             const level =
                 heading[1].length;
 
-
             html += `
                 <h${level}>
-                    ${formatInline(heading[2])}
+                    ${inlineMarkdown(heading[2])}
                 </h${level}>
             `;
 
-
             continue;
-
         }
 
 
-        /* =================================================
-           HORIZONTAL LINE
-           ================================================= */
-
-        if (
-            /^-{3,}$/.test(line.trim()) ||
-            /^\*{3,}$/.test(line.trim()) ||
-            /^_{3,}$/.test(line.trim())
-        ) {
-
-            flushParagraph();
-
-            flushList();
-
-            html += "<hr>";
-
-            continue;
-
-        }
-
-
-        /* =================================================
-           BLOCKQUOTE
-           ================================================= */
-
-        if (
-            line.trim().startsWith(">")
-        ) {
-
-            flushParagraph();
-
-            flushList();
-
-
-            const quoteLines = [];
-
-            let j = i;
-
-
-            while (
-                j < lines.length &&
-                lines[j]
-                    .trim()
-                    .startsWith(">")
-            ) {
-
-                quoteLines.push(
-                    lines[j]
-                        .trim()
-                        .replace(
-                            /^>\s?/,
-                            ""
-                        )
-                );
-
-
-                j++;
-
-            }
-
-
-            html += `
-                <blockquote>
-                    <p>
-                        ${quoteLines
-                            .map(formatInline)
-                            .join("<br>")}
-                    </p>
-                </blockquote>
-            `;
-
-
-            i = j - 1;
-
-            continue;
-
-        }
-
-
-        /* =================================================
-           BULLET
-           ================================================= */
+        /* BULLET */
 
         const bullet =
-            line.match(
-                /^\s*[-*+]\s+(.+)$/
-            );
-
+            line.match(/^\s*[-*+]\s+(.+)$/);
 
         if (bullet) {
 
             flushParagraph();
 
-
             if (listType !== "ul") {
-
                 flushList();
-
                 listType = "ul";
-
             }
 
-
-            listItems.push(
-                bullet[1]
-            );
-
+            listItems.push(bullet[1]);
 
             continue;
-
         }
 
 
-        /* =================================================
-           NUMBERED LIST
-           ================================================= */
+        /* NUMBER */
 
-        const numbered =
-            line.match(
-                /^\s*\d+[.)]\s+(.+)$/
-            );
+        const number =
+            line.match(/^\s*\d+[.)]\s+(.+)$/);
 
-
-        if (numbered) {
+        if (number) {
 
             flushParagraph();
 
-
             if (listType !== "ol") {
-
                 flushList();
-
                 listType = "ol";
-
             }
 
-
-            listItems.push(
-                numbered[1]
-            );
-
+            listItems.push(number[1]);
 
             continue;
-
         }
 
-
-        /* =================================================
-           NORMAL TEXT
-           ================================================= */
 
         if (listType) {
             flushList();
@@ -533,38 +238,24 @@ function formatText(text) {
 
 
         paragraph.push(line);
-
     }
 
 
-    /* =====================================================
-       FINALIZE
-       ===================================================== */
-
-    if (inCodeBlock) {
+    if (codeMode) {
         flushCode();
     }
 
-
     flushParagraph();
-
     flushList();
 
-
     return html;
-
 }
 
-
-/* =========================================================
-   ADD MESSAGE
-   ========================================================= */
 
 function addMessage(role, text) {
 
     const welcome =
         document.querySelector(".welcome");
-
 
     if (welcome) {
         welcome.remove();
@@ -581,8 +272,7 @@ function addMessage(role, text) {
     const avatar =
         document.createElement("div");
 
-    avatar.className =
-        "avatar";
+    avatar.className = "avatar";
 
     avatar.textContent =
         role === "user"
@@ -596,19 +286,14 @@ function addMessage(role, text) {
     content.className =
         "message-content";
 
-
     content.innerHTML =
         formatText(text);
 
 
     wrapper.appendChild(avatar);
-
     wrapper.appendChild(content);
 
     chat.appendChild(wrapper);
-
-
-    scrollToBottom();
 
 
     history.push({
@@ -616,47 +301,117 @@ function addMessage(role, text) {
         text: text
     });
 
-
     history =
         history.slice(-20);
-
-
-    saveHistory();
-
-
-    return content;
-
-}
-
-
-/* =========================================================
-   SAVE HISTORY
-   ========================================================= */
-
-function saveHistory() {
 
     localStorage.setItem(
         "nova_history",
         JSON.stringify(history)
     );
 
+
+    scrollToBottom();
 }
 
 
-/* =========================================================
-   RESTORE CHAT
-   ========================================================= */
+async function sendMessage() {
+
+    const message =
+        messageInput.value.trim();
+
+    if (!message) return;
+
+
+    const requestHistory =
+        history.slice(-10);
+
+
+    addMessage(
+        "user",
+        message
+    );
+
+
+    messageInput.value = "";
+
+
+    if (sendBtn) {
+        sendBtn.disabled = true;
+    }
+
+
+    try {
+
+        const response =
+            await fetch("/chat", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    message: message,
+                    history: requestHistory
+                })
+            });
+
+
+        if (!response.ok) {
+            throw new Error(
+                "HTTP " + response.status
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (!data.reply) {
+            throw new Error(
+                "Respons AI kosong"
+            );
+        }
+
+
+        addMessage(
+            "assistant",
+            data.reply
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "AKA ERROR:",
+            error
+        );
+
+        addMessage(
+            "assistant",
+            "⚠️ Gagal membaca respons dari server AKA."
+        );
+
+    }
+
+
+    if (sendBtn) {
+        sendBtn.disabled = false;
+    }
+
+    messageInput.focus();
+}
+
 
 function restoreChat() {
 
-    if (!history.length) {
-        return;
-    }
+    if (!history.length) return;
 
 
     const welcome =
         document.querySelector(".welcome");
-
 
     if (welcome) {
         welcome.remove();
@@ -675,8 +430,7 @@ function restoreChat() {
         const avatar =
             document.createElement("div");
 
-        avatar.className =
-            "avatar";
+        avatar.className = "avatar";
 
         avatar.textContent =
             item.role === "user"
@@ -690,493 +444,59 @@ function restoreChat() {
         content.className =
             "message-content";
 
-
         content.innerHTML =
             formatText(item.text);
 
 
         wrapper.appendChild(avatar);
-
         wrapper.appendChild(content);
 
         chat.appendChild(wrapper);
-
     });
 
 
     scrollToBottom();
-
 }
 
-
-/* =========================================================
-   SEND MESSAGE
-   ========================================================= */
-
-async function sendMessage() {
-
-    if (!messageInput) {
-        return;
-    }
-
-
-    const message =
-        messageInput.value.trim();
-
-
-    if (!message) {
-        return;
-    }
-
-
-    /*
-     * History sebelum pesan baru.
-     * Ini mencegah pesan terakhir dikirim dua kali.
-     */
-
-    const requestHistory =
-        history.slice(-10);
-
-
-    addMessage(
-        "user",
-        message
-    );
-
-
-    messageInput.value = "";
-
-
-    setLoading(true);
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/chat-stream",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body: JSON.stringify({
-                        message: message,
-                        history: requestHistory
-                    })
-                }
-            );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "HTTP " +
-                response.status
-            );
-
-        }
-
-
-        /*
-         * Buat bubble AKA.
-         */
-
-        const wrapper =
-            document.createElement("div");
-
-        wrapper.className =
-            "message assistant";
-
-
-        const avatar =
-            document.createElement("div");
-
-        avatar.className =
-            "avatar";
-
-        avatar.textContent =
-            "✦";
-
-
-        const content =
-            document.createElement("div");
-
-        content.className =
-            "message-content";
-
-
-        wrapper.appendChild(avatar);
-
-        wrapper.appendChild(content);
-
-        chat.appendChild(wrapper);
-
-
-        /*
-         * Streaming
-         */
-
-        if (response.body) {
-
-            const reader =
-                response.body.getReader();
-
-            const decoder =
-                new TextDecoder("utf-8");
-
-            let fullText = "";
-
-
-            while (true) {
-
-                const {
-                    value,
-                    done
-                } = await reader.read();
-
-
-                if (done) {
-                    break;
-                }
-
-
-                const chunk =
-                    decoder.decode(
-                        value,
-                        {
-                            stream: true
-                        }
-                    );
-
-
-                fullText += chunk;
-
-
-                /*
-                 * Render Markdown
-                 * setiap chunk.
-                 */
-
-                content.innerHTML =
-                    formatText(
-                        fullText
-                    );
-
-
-                scrollToBottom();
-
-            }
-
-
-            /*
-             * Flush decoder.
-             */
-
-            fullText +=
-                decoder.decode();
-
-
-            content.innerHTML =
-                formatText(
-                    fullText
-                );
-
-
-            /*
-             * Simpan jawaban AKA.
-             */
-
-            history.push({
-                role: "assistant",
-                text: fullText
-            });
-
-
-            history =
-                history.slice(-20);
-
-
-            saveHistory();
-
-        } else {
-
-            /*
-             * Fallback JSON
-             */
-
-            const data =
-                await response.json();
-
-
-            const reply =
-                data.reply ||
-                "Tidak ada respons.";
-
-
-            content.innerHTML =
-                formatText(reply);
-
-
-            history.push({
-                role: "assistant",
-                text: reply
-            });
-
-
-            history =
-                history.slice(-20);
-
-
-            saveHistory();
-
-        }
-
-
-    } catch (error) {
-
-        console.error(
-            "AKA ERROR:",
-            error
-        );
-
-
-        /*
-         * Hapus bubble kosong
-         * kalau request gagal.
-         */
-
-        const emptyMessages =
-            chat.querySelectorAll(
-                ".message.assistant"
-            );
-
-
-        const last =
-            emptyMessages[
-                emptyMessages.length - 1
-            ];
-
-
-        if (
-            last &&
-            !last
-                .querySelector(
-                    ".message-content"
-                )
-                .textContent.trim()
-        ) {
-
-            last.remove();
-
-        }
-
-
-        addMessage(
-            "assistant",
-            "⚠️ Gagal membaca respons dari server AKA."
-        );
-
-    }
-
-
-    setLoading(false);
-
-}
-
-
-/* =========================================================
-   LOADING
-   ========================================================= */
-
-function setLoading(loading) {
-
-    if (!sendBtn) {
-        return;
-    }
-
-
-    sendBtn.disabled =
-        loading;
-
-
-    sendBtn.classList.toggle(
-        "loading",
-        loading
-    );
-
-
-    if (loading) {
-
-        sendBtn.dataset.oldText =
-            sendBtn.textContent;
-
-        sendBtn.textContent =
-            "•";
-
-    } else {
-
-        sendBtn.textContent =
-            sendBtn.dataset.oldText ||
-            "➤";
-
-    }
-
-}
-
-
-/* =========================================================
-   SCROLL
-   ========================================================= */
 
 function scrollToBottom() {
 
-    if (!chat) {
-        return;
-    }
-
+    if (!chat) return;
 
     requestAnimationFrame(() => {
-
-        chat.scrollTo({
-            top: chat.scrollHeight,
-            behavior: "smooth"
-        });
-
+        chat.scrollTop =
+            chat.scrollHeight;
     });
-
-}
-
-
-/* =========================================================
-   SUGGESTIONS
-   ========================================================= */
-
-function setupSuggestionButtons() {
-
-    const buttons =
-        document.querySelectorAll(
-            "[data-suggestion]"
-        );
-
-
-    buttons.forEach(button => {
-
-        button.addEventListener(
-            "click",
-            function () {
-
-                const text =
-                    button.dataset.suggestion;
-
-                useSuggestion(text);
-
-            }
-        );
-
-    });
-
 }
 
 
 function useSuggestion(text) {
 
-    if (!messageInput) {
-        return;
-    }
+    if (!messageInput) return;
 
-
-    messageInput.value =
-        text;
-
-
+    messageInput.value = text;
     messageInput.focus();
-
 }
 
-
-/* =========================================================
-   CLEAR CHAT
-   ========================================================= */
 
 function clearChat() {
 
     history = [];
 
-
     localStorage.removeItem(
         "nova_history"
     );
 
-
-    if (chat) {
-
-        const messages =
-            chat.querySelectorAll(
-                ".message"
-            );
-
-
-        messages.forEach(
-            message =>
-                message.remove()
-        );
-
-    }
-
-
     location.reload();
-
 }
 
-
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
 
 function toggleSidebar() {
 
     const sidebar =
-        document.getElementById(
-            "sidebar"
-        );
-
+        document.getElementById("sidebar");
 
     if (sidebar) {
-
-        sidebar.classList.toggle(
-            "open"
-        );
-
+        sidebar.classList.toggle("open");
     }
-
-}
-
-
-/* =========================================================
-   ATTACH BUTTON
-   ========================================================= */
-
-const attachBtn =
-    document.getElementById(
-        "attachBtn"
-    );
-
-
-if (attachBtn) {
-
-    attachBtn.addEventListener(
-        "click",
-        function () {
-
-            console.log(
-                "Attachment belum diaktifkan."
-            );
-
-        }
-    );
-
 }
