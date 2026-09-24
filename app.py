@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from openai import OpenAI
 import os
 
@@ -131,6 +131,105 @@ def chat():
 # =========================
 # ABOUT
 # =========================
+
+
+    
+# =========================================================
+# STREAMING AI
+# =========================================================
+
+def stream_ai(message, history):
+    if client is None:
+        yield "OPENROUTER_API_KEY belum terpasang."
+        return
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Kamu adalah AKA AI, asisten AI yang ramah, pintar, "
+                "dan membantu. Jawab dalam bahasa pengguna. "
+                "Berikan jawaban yang jelas dan mudah dipahami."
+            )
+        }
+    ]
+
+    for item in history[-10:]:
+        role = item.get("role")
+        text = item.get("text", "")
+
+        if not text:
+            continue
+
+        if role == "user":
+            messages.append({
+                "role": "user",
+                "content": text
+            })
+        elif role == "assistant":
+            messages.append({
+                "role": "assistant",
+                "content": text
+            })
+
+    messages.append({
+        "role": "user",
+        "content": message
+    })
+
+    try:
+        stream = client.chat.completions.create(
+            model="openrouter/free",
+            messages=messages,
+            max_tokens=700,
+            temperature=0.7,
+            stream=True
+        )
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+
+            content = chunk.choices[0].delta.content
+
+            if content:
+                yield content
+
+    except Exception as e:
+        print("STREAM ERROR:", repr(e))
+        yield "\n\n⚠️ Terjadi masalah saat AKA AI membuat jawaban."
+
+
+@app.route("/chat-stream", methods=["POST"])
+def chat_stream():
+    data = request.get_json()
+
+    if not data:
+        return Response(
+            "Data tidak diterima.",
+            mimetype="text/plain"
+        )
+
+    message = data.get("message", "").strip()
+    history = data.get("history", [])
+
+    if not message:
+        return Response(
+            "Pesannya masih kosong 😄",
+            mimetype="text/plain"
+        )
+
+    return Response(
+        stream_with_context(
+            stream_ai(message, history)
+        ),
+        mimetype="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 
 @app.route("/about")
 def about():
